@@ -36,6 +36,10 @@ pip install -r requirements.txt
 # 2. 配置智谱 AI 密钥（情绪点歌 + 歌曲情绪分类）
 setx ZHIPU_API_KEY "你的密钥"   # Windows，新开窗口生效
 
+# 2.1（部署到公网前必做）设置 Django 签名密钥
+# 代码里只有占位值，仅供本地开发；部署前必须换成自己的随机字符串
+setx DJANGO_SECRET_KEY "换成你的随机字符串"   # Windows，新开窗口生效
+
 # 3. 初始化数据库 + 启动
 python manage.py migrate
 python manage.py runserver 8000
@@ -106,6 +110,8 @@ python manage.py retag_songs --workers 1     # 串行（更慢但更不容易被
 - 相关命令：`python manage.py fetch_lyrics` 可先批量缓存歌词（可选）
 
 ## 曲库说明
+
+> ⚠️ **仓库不含音乐文件**：`music_library/` 体积 3GB+ 且涉及音乐版权，已按 `.gitignore` 排除。克隆后把自己的 MP3/FLAC 放进去即可自动入库；不放也完全能用「在线曲库」听歌。
 
 - **本地曲库**：把音乐文件放入 `music_library/`，刷新页面自动扫描入库；同名 `.lrc` 文件自动识别为歌词
 - **在线曲库**：三源合一，按优先级 `Jamendo 完整版 > SoundHelix 纯音乐 > iTunes 试听` 合并展示；iTunes 结果 30 秒试听，Jamendo 授权音乐可完整播放
@@ -179,3 +185,7 @@ python manage.py retag_songs --workers 1     # 串行（更慢但更不容易被
 - V1.4 数据看板、每周歌单报告
 
 详细功能说明见 [docs/项目功能介绍.md](docs/项目功能介绍.md)。
+
+## 开源协议
+
+[MIT](LICENSE) © 2026 zhipengGui —— 可自由使用、修改与二次分发，保留版权声明即可。
