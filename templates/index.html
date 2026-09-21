@@ -1,0 +1,584 @@
+{% load static static_ver %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>云律 · 懂情绪的音乐播放器</title>
+    <meta name="description" content="懂情绪的音乐播放器">
+    <meta name="theme-color" content="#5b8cff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="云律">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <link rel="manifest" href="{% static_ver 'manifest.webmanifest' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static_ver 'img/icons/favicon-32x32.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static_ver 'img/icons/icon-180x180.png' %}">
+    <link rel="stylesheet" href="{% static_ver 'css/style.css' %}">
+    <script>
+    /* 主题防闪烁：CSS 渲染前恢复用户选择，未选过时默认云律蓝紫（azure） */
+    (function () {
+        try {
+            var t = localStorage.getItem("yunlu_theme") || "azure";
+            document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+    })();
+    </script>
+</head>
+<body>
+<!-- 情绪动态封面：全屏流动极光/星云背景（ambient.js 驱动） -->
+<canvas id="ambient-bg" aria-hidden="true"></canvas>
+<div class="app">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+        <div class="logo">
+            <span class="logo-icon"><img src="{% static_ver 'img/icons/icon-192x192.png' %}" alt="云律" width="42" height="42"></span>
+            <div>
+                <h1>云<em>律</em></h1>
+                <p>懂情绪的音乐播放器</p>
+            </div>
+        </div>
+        <nav class="nav">
+            <button class="nav-item active" data-view="discover"><span class="nav-ic"></span>发现音乐</button>
+            <button class="nav-item" data-view="recommend"><span class="nav-ic"></span>每日推荐</button>
+            <button class="nav-item" data-view="mood"><span class="nav-ic"></span>情绪点歌台</button>
+            <button class="nav-item" data-view="playlists"><span class="nav-ic"></span>我的歌单</button>
+            <button class="nav-item" data-view="favorites"><span class="nav-ic"></span>我的收藏</button>
+            <button class="nav-item" data-view="recents"><span class="nav-ic"></span>最近播放</button>
+            <button class="nav-item" data-view="report"><span class="nav-ic"></span>听歌报告</button>
+            <button class="nav-item" id="dash-btn" data-view="dashboard" title="实时数据大屏"><span class="nav-ic"></span>数据大屏</button>
+            <button class="nav-item" id="theme-btn"><span class="nav-ic"></span>换肤</button>
+            <button class="nav-item" id="ambient-btn" title="动态背景开关：开启后背景随歌曲情绪变化，关闭则保持深色主题"><span class="nav-ic"></span>动态背景</button>
+            <button class="nav-item" id="help-btn" title="使用技巧 · 隐藏玩法 · 常见问题"><span class="nav-ic"></span>帮助</button>
+            <button class="nav-item" id="settings-btn" title="主题 / 动态背景 / 均衡器 / 频谱等偏好设置"><span class="nav-ic"></span>设置</button>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sources-label">音乐源</div>
+            <div id="sources-list" class="sources-list"><span class="muted">加载中…</span></div>
+        </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="main">
+        <!-- 顶部：搜索 + 情绪输入 + 语音 -->
+        <header class="topbar">
+            <div class="search-box">
+                <span class="search-icon" id="search-icon"></span>
+                <input id="search-input" type="text" placeholder="搜索歌曲、歌手、专辑…">
+            </div>
+            <div class="mood-box">
+                <span class="mood-icon" id="mood-icon"></span>
+                <input id="mood-input" type="text" placeholder="说一句心情，比如：今天加班好累">
+                <button id="mood-btn" class="btn-primary"><span class="mood-btn-ic"></span>AI 点歌</button>
+            </div>
+            <button id="voice-btn" class="voice-btn" title="语音点歌"></button>
+        </header>
+
+        <!-- 语音状态条 + 快捷指令 -->
+        <div id="voice-status" class="voice-status" style="display:none;">
+            <span class="voice-dot"></span><span id="voice-status-text">正在聆听…</span>
+        </div>
+        <div class="quick-bar">
+            <span class="quick-label">快捷点歌</span>
+            <button class="quick-chip" data-voice="放一首舒缓的歌">🌿 舒缓</button>
+            <button class="quick-chip" data-voice="来点欢快的歌">😄 欢快</button>
+            <button class="quick-chip" data-voice="放个动感的歌">🔥 动感</button>
+            <button class="quick-chip" data-voice="来点周小云的歌">🎤 周小云</button>
+            <button class="quick-chip" data-voice="来首钢琴曲">🎹 钢琴</button>
+            <button class="quick-chip" data-voice="随便来一首">🎲 随机</button>
+        </div>
+
+        <!-- 视图容器 -->
+        <div class="content">
+            <!-- 发现音乐视图 -->
+            <section id="view-discover" class="view active">
+                <!-- 推荐 Banner -->
+                <div id="banner" class="banner" style="display:none;">
+                    <div class="banner-tag"><span class="banner-tag-ic"></span>为你推荐</div>
+                    <div class="banner-title" id="banner-title"></div>
+                    <div class="banner-sub" id="banner-sub"></div>
+                    <div class="banner-actions">
+                        <button id="banner-play" class="banner-play"></button>
+                        <button id="banner-shuffle" class="banner-chip">🎲 随机播放</button>
+                    </div>
+                </div>
+
+                <div class="view-header">
+                    <h2 id="discover-title">发现音乐</h2>
+                    <span class="muted" id="song-count"></span>
+                    <button id="btn-rescan" class="btn-primary btn-ghost btn-sm" title="扫描 music_library 下新增的音乐"></button>
+                    <span id="tagging-status" class="muted" style="margin-left:8px;font-size:12px;color:#e0a030;"></span>
+                </div>
+                <div id="search-hint" class="search-hint" style="display:none;">
+                    ⚠ 部分结果为 30 秒试听（iTunes 源）。带「完整版」标签的是 Jamendo 授权音乐可完整播放；想要本地完整曲库，把歌曲放入 <code>music_library</code> 后点「重新扫描」即可。
+                </div>
+                <div id="song-list" class="song-grid"></div>
+                <div id="empty-hint" class="empty-hint" style="display:none;">
+                    <span class="empty-ic">🎧</span>
+                    <p>本地曲库还是空的</p>
+                    <p class="muted">把你的 MP3 文件放入 <code>music_library</code> 文件夹，然后刷新页面即可自动加载</p>
+                </div>
+            </section>
+
+            <!-- 每日推荐视图 -->
+            <section id="view-recommend" class="view">
+                <div class="view-header">
+                    <h2>每日推荐</h2>
+                    <span class="muted">根据你的听歌口味，为你推荐</span>
+                </div>
+                <div id="recommend-list"></div>
+                <div id="recommend-hint" class="empty-hint">
+                    <span class="empty-ic">📅</span>
+                    <p>板块5 开发中</p>
+                </div>
+            </section>
+
+            <!-- 情绪点歌台视图 -->
+            <section id="view-mood" class="view">
+                <div class="view-header">
+                    <h2>情绪点歌台</h2>
+                    <span class="muted">输入你的心情，AI 为你推荐合适歌曲，还可以继续追问哦</span>
+                </div>
+                <div id="mood-chat" class="mood-chat"></div>
+                <div id="mood-hint" class="empty-hint">
+                    <span class="empty-ic">💬</span>
+                    <p>在顶部输入一句话心情</p>
+                    <p class="muted">比如「今天加班好累，想听点治愈的纯音乐」</p>
+                    <div id="mood-quick-chips" class="mood-chips"></div>
+                </div>
+            </section>
+
+            <!-- 我的歌单视图 -->
+            <section id="view-playlists" class="view">
+                <!-- 歌单列表 -->
+                <div id="playlists-main">
+                    <div class="view-header">
+                        <h2>我的歌单</h2>
+                        <button id="create-playlist-btn" class="btn-primary btn-sm"></button>
+                    </div>
+                    <div id="playlists-grid" class="playlists-grid"></div>
+                    <div id="playlists-hint" class="empty-hint" style="display:none;">
+                        <span class="empty-ic">📂</span>
+                        <p>还没有歌单，点击右上角「新建歌单」创建第一个</p>
+                        <p class="muted">把喜欢的歌收集起来，情绪点歌台也会用到它们</p>
+                    </div>
+                </div>
+                <!-- 歌单详情 -->
+                <div id="playlist-detail" style="display:none;">
+                    <button id="back-to-playlists" class="btn-back"></button>
+                    <div class="playlist-detail-header">
+                        <div id="pd-cover" class="pd-cover">🎵</div>
+                        <div class="pd-info">
+                            <h2 id="pd-name"></h2>
+                            <p class="muted" id="pd-desc"></p>
+                            <p class="muted" id="pd-meta"></p>
+                        </div>
+                        <div class="pd-actions">
+                            <button id="add-song-btn" class="btn-primary"></button>
+                            <button id="delete-playlist-btn" class="btn-danger"></button>
+                        </div>
+                    </div>
+                    <div class="song-table">
+                        <div class="table-header">
+                            <span class="col-index">#</span>
+                            <span class="col-title">标题</span>
+                            <span class="col-artist">歌手</span>
+                            <span class="col-album">专辑</span>
+                            <span class="col-duration">时长</span>
+                            <span class="col-actions">操作</span>
+                        </div>
+                        <div id="pd-songs-list"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 听歌报告视图 -->
+            <section id="view-report" class="view">
+                <div class="view-header">
+                    <h2>听歌报告 & 排行榜</h2>
+                    <button id="btn-refresh-report" class="btn-primary btn-ghost btn-sm"></button>
+                </div>
+                <div class="report-tabs">
+                    <button class="report-tab active" data-tab="report"></button>
+                    <button class="report-tab" data-tab="leaderboard"></button>
+                </div>
+                <div id="report-panel" class="report-panel"></div>
+                <div id="leaderboard-panel" class="leaderboard-panel" style="display:none;"></div>
+            </section>
+
+            <!-- 我的收藏视图 -->
+            <section id="view-favorites" class="view">
+                <div class="view-header">
+                    <h2>我的收藏</h2>
+                    <span class="muted" id="favorites-count"></span>
+                </div>
+                <div id="favorites-list" class="song-grid"></div>
+                <div id="favorites-hint" class="empty-hint" style="display:none;">
+                    <span class="empty-ic">💗</span>
+                    <p>还没有收藏任何歌曲</p>
+                    <p class="muted">在歌曲卡片右上角点心形按钮即可收藏</p>
+                </div>
+            </section>
+
+            <!-- 最近播放视图 -->
+            <section id="view-recents" class="view">
+                <div class="view-header">
+                    <h2>最近播放</h2>
+                    <span class="muted" id="recents-count"></span>
+                </div>
+                <div id="recents-list" class="song-grid"></div>
+                <div id="recents-hint" class="empty-hint" style="display:none;">
+                    <span class="empty-ic">🕘</span>
+                    <p>还没有播放记录</p>
+                    <p class="muted">播放过的歌曲会自动出现在这里</p>
+                </div>
+            </section>
+
+            <!-- 数据大屏视图（内嵌独立大屏页面，懒加载 src） -->
+            <section id="view-dashboard" class="view">
+                <iframe id="dash-frame" title="实时数据大屏" allow="fullscreen"></iframe>
+            </section>
+
+            <!-- 添加歌曲弹窗 -->
+            <div id="add-song-modal" class="modal" style="display:none;">
+                <div class="modal-box">
+                    <div class="modal-header">
+                        <h3>添加歌曲到歌单</h3>
+                        <button class="modal-close" onclick="closeAddSongModal()">✕</button>
+                    </div>
+                    <div class="modal-search">
+                        <input id="modal-search-input" type="text" placeholder="搜索歌曲（本地 + 在线）…">
+                    </div>
+                    <div id="modal-search-results" class="modal-results"><div class="empty-hint">输入关键词搜索</div></div>
+                </div>
+            </div>
+
+            <!-- 新建歌单弹窗 -->
+            <div id="create-playlist-modal" class="modal" style="display:none;">
+                <div class="modal-box">
+                    <div class="modal-header">
+                        <h3>新建歌单</h3>
+                        <button class="modal-close" onclick="closeCreateModal()">✕</button>
+                    </div>
+                    <div class="modal-form">
+                        <input id="pl-name" type="text" placeholder="歌单名称">
+                        <input id="pl-desc" type="text" placeholder="一句话描述（可选）">
+                        <input id="pl-cover" type="file" accept="image/*">
+                        <button id="pl-submit" class="btn-primary">创建</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 歌词面板 -->
+    <div id="lyric-panel" class="lyric-panel" style="display:none;">
+        <div class="lyric-toolbar">
+            <span class="lyric-toolbar-title">歌词</span>
+            <button id="btn-make-poster" class="btn-primary btn-sm">🎨 生成歌词海报</button>
+        </div>
+        <!-- 歌词情绪曲线：逐句情绪分析，随播放推进 -->
+        <div class="lyric-curve-wrap">
+            <canvas id="lyric-curve" class="lyric-curve"></canvas>
+        </div>
+        <div class="lyric-scroll">
+            <div id="lyric-lines"></div>
+        </div>
+    </div>
+
+    <!-- 海报弹窗 -->
+    <div id="poster-modal" class="modal" style="display:none;">
+        <div class="modal-box poster-box">
+            <div class="modal-header">
+                <h3>歌词海报</h3>
+                <button class="modal-close" onclick="closePosterModal()">✕</button>
+            </div>
+            <div class="poster-canvas-wrap">
+                <canvas id="poster-canvas" width="540" height="960"></canvas>
+            </div>
+            <div class="poster-actions">
+                <span id="poster-template-name" class="poster-template-name">沉浸氛围 · 封面沉浸</span>
+                <div id="poster-thumbs" class="poster-thumbs"></div>
+                <button id="poster-bg-refresh" class="btn-primary btn-ghost">🎨 换背景</button>
+                <div class="poster-size-group">
+                    <button class="poster-size-btn active" data-size="portrait">9:16</button>
+                    <button class="poster-size-btn" data-size="square">1:1</button>
+                </div>
+                <button id="poster-download" class="btn-primary">⬇ 下载海报</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 频谱可视化 -->
+    <canvas id="spectrum" class="spectrum" width="1400" height="150"></canvas>
+
+    <!-- 底部播放条 -->
+    <footer class="player-bar">
+        <div class="player-left">
+            <div class="now-cover" id="now-cover">🎵</div>
+            <div class="now-info">
+                <div class="now-title" id="now-title">未播放</div>
+                <div class="now-artist" id="now-artist"></div>
+            </div>
+        </div>
+        <div class="player-center">
+            <div class="controls">
+                <button id="btn-prev" class="ctl-btn" title="上一首"></button>
+                <button id="btn-play" class="ctl-btn ctl-play" title="播放/暂停"></button>
+                <button id="btn-next" class="ctl-btn" title="下一首"></button>
+                <button id="btn-mode" class="ctl-btn" title="播放模式"></button>
+                <button id="btn-lyric" class="ctl-btn" title="歌词"></button>
+            </div>
+            <div class="progress-row">
+                <span class="time" id="time-cur">0:00</span>
+                <input type="range" id="progress" min="0" max="1000" value="0" class="progress-bar">
+                <span class="time" id="time-total">0:00</span>
+            </div>
+        </div>
+        <div class="player-right">
+            <button id="btn-spectrum" class="ctl-btn" title="收起频谱"></button>
+            <button id="btn-eq" class="ctl-btn" title="均衡器"></button>
+            <button id="btn-timer" class="ctl-btn" title="定时关闭"></button>
+            <span class="vol-icon" id="vol-icon"></span>
+            <input type="range" id="volume" min="0" max="100" value="80" class="volume-bar">
+        </div>
+    </footer>
+</div>
+
+<!-- 主题换肤面板 -->
+<div id="theme-modal" class="modal" style="display:none;">
+    <div class="modal-box theme-box">
+        <div class="modal-header">
+            <h3>换肤 · 选择主题色</h3>
+            <button class="modal-close" onclick="closeThemeModal()">✕</button>
+        </div>
+        <div class="theme-grid" id="theme-grid"></div>
+    </div>
+</div>
+
+<!-- 键盘快捷键帮助面板 -->
+<div id="shortcut-modal" class="modal" style="display:none;">
+    <div class="modal-box shortcut-box">
+        <div class="modal-header">
+            <h3>⌨️ 键盘快捷键</h3>
+            <button class="modal-close" id="shortcut-close" title="关闭">✕</button>
+        </div>
+        <div class="shortcut-grid">
+            <div class="shortcut-group">
+                <div class="shortcut-group-title">播放控制</div>
+                <div class="shortcut-row"><span class="key">空格</span><span class="sc-desc">播放 / 暂停</span></div>
+                <div class="shortcut-row"><span class="key">←</span><span class="key">→</span><span class="sc-desc">上一首 / 下一首</span></div>
+                <div class="shortcut-row"><span class="key">↑</span><span class="key">↓</span><span class="sc-desc">音量加 / 减</span></div>
+                <div class="shortcut-row"><span class="key">M</span><span class="sc-desc">静音 / 取消静音</span></div>
+                <div class="shortcut-row"><span class="key">[</span><span class="key">]</span><span class="sc-desc">快退 / 快进 10 秒</span></div>
+                <div class="shortcut-row"><span class="key">R</span><span class="sc-desc">切换播放模式</span></div>
+            </div>
+            <div class="shortcut-group">
+                <div class="shortcut-group-title">快捷操作</div>
+                <div class="shortcut-row"><span class="key">/</span><span class="sc-desc">搜索歌曲</span></div>
+                <div class="shortcut-row"><span class="key">Ctrl</span><span class="key">K</span><span class="sc-desc">搜索歌曲</span></div>
+                <div class="shortcut-row"><span class="key">Ctrl</span><span class="key">L</span><span class="sc-desc">AI 点歌</span></div>
+                <div class="shortcut-row"><span class="key">F</span><span class="sc-desc">收藏 / 取消收藏</span></div>
+                <div class="shortcut-row"><span class="key">1</span><span class="key">~</span><span class="key">7</span><span class="sc-desc">切换板块</span></div>
+                <div class="shortcut-row"><span class="key">?</span><span class="sc-desc">快捷键帮助</span></div>
+                <div class="shortcut-row"><span class="key">Esc</span><span class="sc-desc">关闭 / 取消聚焦</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 帮助中心 -->
+<div id="help-modal" class="modal" style="display:none;">
+    <div class="modal-box help-box">
+        <div class="modal-header">
+            <h3>💡 帮助 · 使用技巧</h3>
+            <button class="modal-close" onclick="closeHelpModal()" title="关闭">✕</button>
+        </div>
+        <div class="help-tabs">
+            <button class="help-tab active" data-help="tips">新手必看</button>
+            <button class="help-tab" data-help="pro">隐藏玩法</button>
+            <button class="help-tab" data-help="about">关于云律</button>
+        </div>
+        <div class="help-body">
+            <div class="help-panel active" id="help-panel-tips">
+                <div class="tip-card">
+                    <span class="tip-ic">🎧</span>
+                    <div>
+                        <div class="tip-title">让本地曲库更完整</div>
+                        <div class="tip-desc">把 MP3 放进项目根目录的 <code>music_library</code> 文件夹，点「发现音乐」右上角的重新扫描即可。在线搜索的部分歌曲是 30 秒试听（iTunes），带「完整版」标签的是 Jamendo 授权音乐，可完整播放。</div>
+                    </div>
+                </div>
+                <div class="tip-card">
+                    <span class="tip-ic">🤖</span>
+                    <div>
+                        <div class="tip-title">AI 情绪点歌可以追问</div>
+                        <div class="tip-desc">在顶部输入一句心情，比如「今天加班好累」，点「AI 点歌」。点歌后还可以继续追问：「换一首更舒缓的」「不要纯音乐」等，会按你的反馈重新推荐。</div>
+                    </div>
+                </div>
+                <div class="tip-card">
+                    <span class="tip-ic">🎤</span>
+                    <div>
+                        <div class="tip-title">语音点歌</div>
+                        <div class="tip-desc">点顶栏的麦克风说出需求（如「来点周小云的歌」）即可自动播放。语音识别需要 Chrome / Edge 浏览器；旁边一排快捷点歌按钮可在任何浏览器使用。</div>
+                    </div>
+                </div>
+                <div class="tip-card">
+                    <span class="tip-ic">🧠</span>
+                    <div>
+                        <div class="tip-title">自动记忆你的偏好</div>
+                        <div class="tip-desc">主题换肤、动态背景、均衡器、音量、播放模式都会自动保存；刷新页面后还会继续上次的播放进度。设置面板里可以一键集中调整。</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-panel" id="help-panel-pro">
+                <div class="tip-card">
+                    <span class="tip-ic">🖱️</span>
+                    <div>
+                        <div class="tip-title">歌曲卡片上右键</div>
+                        <div class="tip-desc">右键点击任意歌曲：立即播放、收藏、加入已有歌单，还能直接新建歌单，不必先打开歌单页面。</div>
+                    </div>
+                </div>
+                <div class="tip-card">
+                    <span class="tip-ic">↕️</span>
+                    <div>
+                        <div class="tip-title">歌单拖拽排序</div>
+                        <div class="tip-desc">「我的歌单」打开某个歌单后，按住歌曲行拖动即可调整顺序；右键可以移除单曲。</div>
+                    </div>
+                </div>
+                <div class="tip-card">
+                    <span class="tip-ic">⌨️</span>
+                    <div>
+                        <div class="tip-title">键盘快捷键</div>
+                        <div class="tip-desc">空格播放/暂停，←/→ 切歌，↑/↓ 音量，F 收藏，R 切换播放模式，Ctrl+K 搜索，Ctrl+L AI 点歌，数字键 1~7 切换板块。随时按 <code>?</code> 查看完整清单。</div>
+                    </div>
+                </div>
+                <div class="tip-card">
+                    <span class="tip-ic">🎨</span>
+                    <div>
+                        <div class="tip-title">歌词海报</div>
+                        <div class="tip-desc">播放时点底部「歌词」打开歌词面板，右侧可一键生成歌词海报：多套模板、随机换背景、9:16 或 1:1 比例，适合发朋友圈。</div>
+                    </div>
+                </div>
+                <div class="tip-card">
+                    <span class="tip-ic">🎚️</span>
+                    <div>
+                        <div class="tip-title">音效与定时</div>
+                        <div class="tip-desc">播放条右侧的均衡器有 7 档预设（流行/摇滚/低音/人声等）；定时关闭支持「停止播放 / 播完当前曲 / 倒计时」，适合睡前听歌。</div>
+                    </div>
+                </div>
+                <div class="tip-card">
+                    <span class="tip-ic">📊</span>
+                    <div>
+                        <div class="tip-title">听歌报告与数据大屏</div>
+                        <div class="tip-desc">侧边栏「听歌报告」按周/月看口味分析，「数据大屏」实时展示播放排行，答辩演示或自我回顾都好用。</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-panel" id="help-panel-about">
+                <div class="about-box">
+                    <div class="about-logo">云<em>律</em></div>
+                    <div class="about-name">云律 AI · 懂情绪的音乐播放器</div>
+                    <p class="muted about-desc">课程设计作品：Django 提供后端服务，前端基于 Web Audio API 实时频谱，结合情绪分析、AI 推荐与语音点歌，把「听歌」变成「表达心情」。</p>
+                    <div class="about-tags">
+                        <span class="about-tag">🎵 本地曲库</span>
+                        <span class="about-tag">🌐 iTunes 试听</span>
+                        <span class="about-tag">✅ Jamendo 完整版</span>
+                        <span class="about-tag">🤖 AI 推荐</span>
+                        <span class="about-tag">🗣️ 语音点歌</span>
+                    </div>
+                    <p class="muted about-privacy">🔒 隐私说明：主题、均衡器等偏好与听歌记录只保存在本机浏览器（localStorage），不上传到任何服务器。</p>
+                </div>
+            </div>
+        </div>
+        <div class="help-footer">
+            <button class="btn-primary btn-ghost btn-sm" id="help-shortcut-btn">⌨️ 键盘快捷键</button>
+            <button class="btn-primary btn-ghost btn-sm" id="help-replay-btn">🔁 重新播放新手引导</button>
+        </div>
+    </div>
+</div>
+
+<!-- 设置面板 -->
+<div id="settings-modal" class="modal" style="display:none;">
+    <div class="modal-box settings-box">
+        <div class="modal-header">
+            <h3>⚙️ 设置</h3>
+            <button class="modal-close" onclick="closeSettingsModal()" title="关闭">✕</button>
+        </div>
+        <div class="settings-body">
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">主题配色</div>
+                    <div class="setting-desc">与「换肤」面板同步，实时预览</div>
+                </div>
+                <div class="theme-dots" id="setting-themes"></div>
+            </div>
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">动态氛围背景</div>
+                    <div class="setting-desc">全屏极光 / 星云随歌曲情绪流动</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="setting-ambient"><span class="switch-track"></span></label>
+            </div>
+            <div class="setting-row setting-col">
+                <div class="setting-info">
+                    <div class="setting-name">均衡器预设</div>
+                    <div class="setting-desc">当前：<b class="setting-cur" id="eq-current-name">关闭</b></div>
+                </div>
+                <div class="chips" id="setting-eq"></div>
+            </div>
+            <div class="setting-row setting-col">
+                <div class="setting-info">
+                    <div class="setting-name">播放模式</div>
+                    <div class="setting-desc">当前：<b class="setting-cur" id="mode-current-name">顺序播放</b>，也可按 <code>R</code> 或点播放条模式键切换</div>
+                </div>
+                <div class="chips" id="setting-mode"></div>
+            </div>
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">频谱条默认展开</div>
+                    <div class="setting-desc">播放条上方实时频谱条的默认状态</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="setting-spectrum"><span class="switch-track"></span></label>
+            </div>
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">新手引导</div>
+                    <div class="setting-desc">重新播放首次打开时的引导气泡</div>
+                </div>
+                <button class="btn-primary btn-ghost btn-sm" id="setting-replay">重新播放</button>
+            </div>
+        </div>
+        <div class="settings-footer">所有设置自动保存在本机浏览器，无需账号。</div>
+    </div>
+</div>
+
+<script src="{% static_ver 'js/icons.js' %}"></script>
+<script src="{% static_ver 'js/cover.js' %}"></script>
+<script src="{% static_ver 'js/api.js' %}"></script>
+<script src="{% static_ver 'js/player.js' %}"></script>
+<script src="{% static_ver 'js/ambient.js' %}"></script>
+<script src="{% static_ver 'js/media-session.js' %}"></script>
+<script src="{% static_ver 'js/app.js' %}"></script>
+<script src="{% static_ver 'js/favorites.js' %}"></script>
+<script src="{% static_ver 'js/context-menu.js' %}"></script>
+<script src="{% static_ver 'js/playlist.js' %}"></script>
+<script src="{% static_ver 'js/lyrics.js' %}"></script>
+<script src="{% static_ver 'js/lyric-curve.js' %}"></script>
+<script src="{% static_ver 'js/recommend.js' %}"></script>
+<script src="{% static_ver 'js/mood.js' %}"></script>
+<script src="{% static_ver 'js/poster.js' %}"></script>
+<script src="{% static_ver 'js/voice.js' %}"></script>
+<script src="{% static_ver 'js/spectrum.js' %}"></script>
+<script src="{% static_ver 'js/eq.js' %}"></script>
+<script src="{% static_ver 'js/timer.js' %}"></script>
+<script src="{% static_ver 'js/report.js' %}"></script>
+<script src="{% static_ver 'js/shortcuts.js' %}"></script>
+<script src="{% static_ver 'js/theme.js' %}"></script>
+<script src="{% static_ver 'js/help.js' %}"></script>
+<script src="{% static_ver 'js/settings.js' %}"></script>
+<script src="{% static_ver 'js/onboard.js' %}"></script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云律 AI · 验收流程图</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body { font-family: "Microsoft YaHei", sans-serif; background:#f6f7fb; margin:0; padding:24px; }
+  .title { text-align:center; font-size:22px; font-weight:600; color:#1f2937; margin:8px 0 4px; }
+  .sub { text-align:center; color:#6b7280; font-size:13px; margin-bottom:24px; }
+  .card { background:#fff; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.06); margin:0 auto 32px; max-width:1100px; padding:20px; }
+  .card h2 { font-size:17px; color:#4f46e5; margin:4px 0 12px; border-left:4px solid #4f46e5; padding-left:10px; }
+  .mermaid { display:flex; justify-content:center; }
+  .tip { color:#9ca3af; font-size:12px; text-align:right; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="title">云律 AI · 项目验收流程图</div>
+<div class="sub">懂情绪的音乐播放器 · Django + 原生 JS + 智谱 GLM + 多在线音乐源</div>
+
+<div class="card">
+  <h2>图 1 · 系统架构图</h2>
+  <pre class="mermaid">
+flowchart TB
+    subgraph Client["客户端"]
+        U["浏览器 / 手机 · PWA 可安装"]
+        JS["前端模块 21 个：player / lyrics / mood / voice / playlist / recommend / poster / report / eq / spectrum / theme ···"]
+    end
+    subgraph Server["Django 后端（8 大板块 + 口令）"]
+        G["gate 访问口令"]
+        M["music 曲库·播放流·搜索"]
+        P["playlists 歌单管理"]
+        L["lyrics 歌词同步"]
+        R["recommend 每日推荐"]
+        D["mood AI 情绪点歌·分类"]
+        S["posters 歌词海报"]
+        T["report 报告·排行榜"]
+        W["web 页面 + 数据大屏"]
+    end
+    subgraph Data["数据层"]
+        DB[("SQLite：498 首歌 / 歌单 / 听歌记录")]
+        LIB["本地曲库 music_library · 3.08 GB"]
+        LS[("localStorage：收藏/最近播放/主题/断点")]
+    end
+    subgraph Third["第三方服务"]
+        AI["智谱 GLM 情绪分析"]
+        LY["网易云 / lrclib 歌词"]
+        IT["iTunes 30s 试听"]
+        JM["Jamendo 15万+ 完整版"]
+        SH["SoundHelix 纯音乐"]
+        VO["Web Speech 语音识别"]
+    end
+    U --> JS
+    JS -- "HTTP / JSON" --> G
+    G --> M & P & L & R & D & S & T & W
+    M --> DB & LIB
+    P --> DB
+    T --> DB
+    W --> DB
+    D --> AI
+    L --> LY
+    M --> IT & JM & SH
+    JS --> VO
+  </pre>
+  <div class="tip">数据流：前端 → 口令校验 → 8 大板块 → 数据/第三方</div>
+</div>
+
+<div class="card">
+  <h2>图 2 · AI 情绪点歌核心流程</h2>
+  <pre class="mermaid">
+flowchart LR
+    A["输入：今天加班好累，想听点治愈的纯音乐"] --> B{"语音还是文字？"}
+    B -- "语音" --> V["Web Speech 识别"]
+    B -- "文字" --> C["智谱 GLM 分析"]
+    V --> C
+    C --> D["输出：情绪标签 + 曲风 + 推荐说明"]
+    D --> E["12 类情绪标签优先匹配"]
+    E --> F{"本地曲库命中？"}
+    F -- "是" --> G["返回歌曲列表，载入播放队列"]
+    F -- "否" --> H["曲风补缺"]
+    H --> I{"仍无结果？"}
+    I -- "是" --> J["热门 / 随机兜底"]
+    I -- "否" --> G
+    J --> G
+    G --> K["点击即播 · 记录播放 → 反馈给推荐 / 报告"]
+  </pre>
+  <div class="tip">三级兜底：情绪标签 → 曲风 → 热门/随机，AI 不可用时自动降级关键词规则</div>
+</div>
+
+<div class="card">
+  <h2>图 3 · 验收演示路线图（15~20 分钟）</h2>
+  <pre class="mermaid">
+flowchart LR
+    S1["① 开场定位 1min"] --> S2["② 曲库·搜索 1.5min"]
+    S2 --> S3["③ 播放器增强 2min"]
+    S3 --> S4["④ 歌词 1.5min"]
+    S4 --> S5["⑤ 歌单·收藏 1.5min"]
+    S5 --> S6["⑥ 每日推荐 1min"]
+    S6 --> S7["⑦ AI 情绪点歌 3min ⭐"]
+    S7 --> S8["⑧ 语音点歌 1min"]
+    S8 --> S9["⑨ 报告·海报 1.5min"]
+    S9 --> S10["⑩ 数据大屏 3min ⭐"]
+    S10 --> S11["⑪ 换肤·PWA 1.5min"]
+    S11 --> S12["⑫ 架构·扩展 1min"]
+  </pre>
+  <div class="tip">⭐ 为重点演示环节：AI 情绪点歌 + 数据大屏</div>
+</div>
+
+</body>
+</html>

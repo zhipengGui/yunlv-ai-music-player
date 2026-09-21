@@ -1,0 +1,6 @@
+Django>=6.0
+mutagen>=1.47
+requests>=2.31
+Pillow>=10.0
+pypinyin>=0.48
+numpy>=1.24

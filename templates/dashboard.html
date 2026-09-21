@@ -1,0 +1,106 @@
+{% load static static_ver %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云律 · 实时数据大屏</title>
+<meta name="description" content="云律 AI 音乐播放器 · 实时数据大屏">
+<link rel="icon" href="{% static_ver 'img/icons/icon-192x192.png' %}">
+<link rel="stylesheet" href="{% static_ver 'css/dashboard.css' %}">
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-glow bg-glow-1"></div>
+<div class="bg-glow bg-glow-2"></div>
+
+<header class="dash-header">
+    <div class="dash-logo">
+        <span class="dash-logo-badge">云</span>
+        <div class="dash-logo-text">
+            <h1>云律 · 实时数据大屏</h1>
+            <p>CLOUD LAW · LIVE DATA DASHBOARD</p>
+        </div>
+    </div>
+    <div class="dash-clock">
+        <span id="dash-time" class="dash-time">--:--:--</span>
+        <span id="dash-date" class="dash-date">----</span>
+    </div>
+    <div class="dash-actions">
+        <span class="live-badge"><i></i>LIVE</span>
+        <button id="dash-fullscreen" class="dash-btn" title="全屏显示">全屏</button>
+        <a id="dash-back" class="dash-btn" href="/">返回播放器</a>
+    </div>
+</header>
+
+<main class="dash-main">
+    <!-- KPI 指标卡 -->
+    <section class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">累计播放</div>
+            <div class="kpi-value" data-kpi="total"><span class="num">0</span><em>首</em></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">今日播放</div>
+            <div class="kpi-value" data-kpi="today"><span class="num">0</span><em>首</em></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">近 1 小时</div>
+            <div class="kpi-value" data-kpi="hour"><span class="num">0</span><em>首</em></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">不重样歌曲</div>
+            <div class="kpi-value" data-kpi="unique"><span class="num">0</span><em>首</em></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">高频时段</div>
+            <div class="kpi-value kpi-text" data-kpi="top_hour"><span class="num">-</span></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">累计时长</div>
+            <div class="kpi-value" data-kpi="minutes"><span class="num">0</span><em>分钟</em></div>
+        </div>
+    </section>
+
+    <!-- 图表区 -->
+    <section class="panel-grid">
+        <div class="panel panel-trend">
+            <div class="panel-title">近 7 天播放趋势</div>
+            <canvas id="chart-trend" class="chart"></canvas>
+        </div>
+        <div class="panel panel-mood">
+            <div class="panel-title">情绪分布</div>
+            <div class="mood-wrap">
+                <canvas id="chart-mood" class="chart chart-donut"></canvas>
+                <div class="mood-center">
+                    <div id="mood-center-num">0</div>
+                    <div class="muted">次播放</div>
+                </div>
+            </div>
+            <ul id="mood-legend" class="chart-legend"></ul>
+        </div>
+        <div class="panel panel-hot">
+            <div class="panel-title">热歌榜 TOP 10</div>
+            <ol id="hot-list" class="hot-list"></ol>
+        </div>
+        <div class="panel panel-hour">
+            <div class="panel-title">今日 24 小时播放分布</div>
+            <canvas id="chart-hour" class="chart"></canvas>
+        </div>
+        <div class="panel panel-live">
+            <div class="panel-title">实时播放流 <span class="panel-tip">每 4 秒自动刷新</span></div>
+            <div id="live-feed" class="live-feed"></div>
+        </div>
+    </section>
+</main>
+
+<div id="dash-empty" class="dash-empty" style="display:none;">
+    <div class="dash-empty-icon">📊</div>
+    <p>还没有播放数据</p>
+    <p class="muted">回到播放器播放几首歌，大屏会自动开始记录</p>
+    <a class="dash-btn" href="/">去播放 →</a>
+</div>
+
+<script src="{% static_ver 'js/dashboard.js' %}"></script>
+</body>
+</html>

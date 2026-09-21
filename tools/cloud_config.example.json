@@ -1,0 +1,29 @@
+{
+  "_说明": "复制本文件为 tools/cloud_config.json 后填写。provider 只保留一家（oss/cos/qiniu），其余字段可留空。",
+  "provider": "oss",
+  "oss": {
+    "access_key_id": "填你的 AccessKey ID",
+    "access_key_secret": "填你的 AccessKey Secret",
+    "endpoint": "https://oss-cn-hangzhou.aliyuncs.com",
+    "bucket": "填你的 Bucket 名",
+    "public_domain": "https://填你的bucket名.oss-cn-hangzhou.aliyuncs.com"
+  },
+  "cos": {
+    "secret_id": "",
+    "secret_key": "",
+    "region": "ap-guangzhou",
+    "bucket": "填 Bucket 名（含后缀 APPID，如 xxx-1250000000）",
+    "public_domain": "https://填你的bucket名.cos.ap-guangzhou.myqcloud.com"
+  },
+  "qiniu": {
+    "access_key": "",
+    "secret_key": "",
+    "bucket": "填你的空间名",
+    "public_domain": "https://填你的测试域名或已绑定的自定义域名"
+  },
+  "static_cdn": {
+    "_说明": "方案二开关：页面 JS/CSS/封面是否从对象存储加载。enabled=true 后（先执行 python manage.py upload_statics 上传）静态资源走云，远程首屏秒开；回滚把 enabled 置 false 或设环境变量 CLOUD_STATIC_BASE=off 即回本地",
+    "enabled": false,
+    "base": ""
+  }
+}
